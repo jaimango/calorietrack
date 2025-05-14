@@ -510,6 +510,9 @@ export default function HomePage() {
       <footer className="w-full mt-16 text-center text-slate-500 text-xs">
         <p>CalorieTrack &copy; {new Date().getFullYear()}</p>
         <p className="mt-1">Remember to set your <code className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md text-xs">NEXT_PUBLIC_OPENAI_KEY</code> environment variable.</p>
+        <p className="mt-3 text-xs italic text-slate-400">
+          Disclaimer: AI-powered calorie estimates are for informational purposes only and may not be 100% accurate. Consult with a nutritionist or healthcare provider for precise dietary advice.
+        </p>
       </footer>
     </div>
   );
