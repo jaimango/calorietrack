@@ -1,0 +1,51 @@
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+
+# Dependencies
+/node_modules
+/.pnp
+.pnp.js
+
+# Testing
+/coverage
+
+# Next.js build output
+/.next/
+/out/
+
+# Minified and bundled files
+/dist
+/build
+
+# Production
+/build
+
+# Misc
+.DS_Store
+*.pem
+
+# Local environment variables
+.env.local
+.env.development.local
+.env.production.local
+.env.test.local
+.env*.local # More general pattern to catch all .env.local variations
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Optional editor directories
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.sublime-workspace
+
+# Optional eslint cache
+.eslintcache
+
+# Turbo
+.turbo
+
+# Drizzle
+migrations/ 
