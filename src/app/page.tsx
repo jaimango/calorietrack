@@ -75,6 +75,42 @@ const generateMealDescriptionFromImage = async (imageBase64: string): Promise<st
   }
 };
 
+// Helper to resize image to max dimension (e.g., 512px)
+const resizeImage = (file: File, maxSize = 512): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const img = new window.Image();
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      if (!e.target?.result) return reject('Failed to read image');
+      img.src = e.target.result as string;
+    };
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      let { width, height } = img;
+      if (width > height) {
+        if (width > maxSize) {
+          height = Math.round((height * maxSize) / width);
+          width = maxSize;
+        }
+      } else {
+        if (height > maxSize) {
+          width = Math.round((width * maxSize) / height);
+          height = maxSize;
+        }
+      }
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return reject('Failed to get canvas context');
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL('image/jpeg', 0.85)); // JPEG, quality 85%
+    };
+    img.onerror = reject;
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+};
+
 export default function HomePage() {
   const [dailyGoal, setDailyGoal] = useState<number>(DEFAULT_DAILY_GOAL);
   const [consumedCalories, setConsumedCalories] = useState<number>(0);
@@ -372,24 +408,21 @@ export default function HomePage() {
     }
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64String = reader.result as string;
+      try {
+        setIsLoading(true);
+        const base64String = await resizeImage(file, 512); // Resize before sending
         handleMealSubmit(mealInput.trim(), base64String);
-      };
-      reader.onerror = () => {
-        setError('Failed to read image file.');
+      } catch (err) {
+        setError('Failed to process image.');
         setIsLoading(false);
-      };
-      reader.readAsDataURL(file);
-      setIsLoading(true); 
+      }
     } else {
-        if (fileInputRef.current) {
-            fileInputRef.current.value = '';
-        }
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
 
