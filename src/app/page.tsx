@@ -88,19 +88,63 @@ export default function HomePage() {
   const [expandedHistoryDate, setExpandedHistoryDate] = useState<string | null>(null);
   const [manualCalories, setManualCalories] = useState<string>(''); // New state for manual calorie input
 
-  // Load data from localStorage on initial render
+  // Load data from localStorage on initial render and check for date change
   useEffect(() => {
     const storedDailyGoal = localStorage.getItem('dailyGoal');
     if (storedDailyGoal) setDailyGoal(JSON.parse(storedDailyGoal));
-
     const storedCalories = localStorage.getItem('consumedCalories');
     if (storedCalories) setConsumedCalories(JSON.parse(storedCalories));
-
     const storedLog = localStorage.getItem('calorieLog');
     if (storedLog) setLog(JSON.parse(storedLog));
-
     const storedHistory = localStorage.getItem('calorieHistory');
     if (storedHistory) setCalorieHistory(JSON.parse(storedHistory));
+
+    // --- New: Date check on load ---
+    const getFormattedDate = (date: Date): string => date.toISOString().split('T')[0];
+    const todayStr = getFormattedDate(new Date());
+    const lastLog = storedLog ? JSON.parse(storedLog) : [];
+    // Find the most recent non-reset log entry
+    const lastEntry = lastLog.find((entry: any) => entry.text !== 'Daily Reset for new day');
+    let lastEntryDate = null;
+    if (lastEntry) {
+      lastEntryDate = getFormattedDate(new Date(lastEntry.timestamp));
+    }
+    // If there are no entries, or the last entry is from a previous day, trigger a reset
+    if (lastEntryDate && lastEntryDate !== todayStr) {
+      // Save yesterday's log to history
+      const storedCaloriesNum = storedCalories ? JSON.parse(storedCalories) : 0;
+      const storedDailyGoalNum = storedDailyGoal ? JSON.parse(storedDailyGoal) : dailyGoal;
+      const newHistoryEntry = {
+        date: lastEntryDate,
+        totalCalories: storedCaloriesNum,
+        mealLog: lastLog.filter((entry: any) => entry.text !== 'Daily Reset for new day'),
+        dailyGoalAtTheTime: storedDailyGoalNum,
+      };
+      const prevHistory = storedHistory ? JSON.parse(storedHistory) : [];
+      const filteredHistory = prevHistory.filter((entry: any) => entry.date !== lastEntryDate);
+      const updatedHistory = [newHistoryEntry, ...filteredHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setCalorieHistory(updatedHistory);
+      localStorage.setItem('calorieHistory', JSON.stringify(updatedHistory));
+      // Reset log and calories for today
+      setConsumedCalories(0);
+      setLog([
+        {
+          id: Date.now().toString(),
+          text: 'Daily Reset for new day',
+          calories: 0,
+          timestamp: Date.now(),
+        },
+      ]);
+      localStorage.setItem('consumedCalories', '0');
+      localStorage.setItem('calorieLog', JSON.stringify([
+        {
+          id: Date.now().toString(),
+          text: 'Daily Reset for new day',
+          calories: 0,
+          timestamp: Date.now(),
+        },
+      ]));
+    }
   }, []);
 
   // Save data to localStorage whenever states change
