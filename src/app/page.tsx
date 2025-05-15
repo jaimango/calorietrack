@@ -86,6 +86,7 @@ export default function HomePage() {
   const [calorieHistory, setCalorieHistory] = useState<DailyHistoryEntry[]>([]); // State for history
   const [showHistory, setShowHistory] = useState<boolean>(false); // State to toggle history view
   const [expandedHistoryDate, setExpandedHistoryDate] = useState<string | null>(null);
+  const [manualCalories, setManualCalories] = useState<string>(''); // New state for manual calorie input
 
   // Load data from localStorage on initial render
   useEffect(() => {
@@ -199,7 +200,7 @@ export default function HomePage() {
   };
 
   const handleMealSubmit = async (text: string, imageBase64?: string) => {
-    if (!OPENAI_API_KEY) {
+    if (!OPENAI_API_KEY && !manualCalories) {
       setError(
         'OpenAI API key is not configured. Please set NEXT_PUBLIC_OPENAI_KEY in your .env.local file.'
       );
@@ -209,6 +210,37 @@ export default function HomePage() {
     if (!text && !imageBase64) return;
     setIsLoading(true);
     setError(null);
+
+    // If user provided calories, use them directly
+    if (manualCalories.trim() !== '' && !isNaN(Number(manualCalories))) {
+      const caloriesNum = Math.max(0, Math.round(Number(manualCalories)));
+      let entryText = text.trim();
+      if (imageBase64 && !entryText) {
+        setIsLoading(true);
+        const imageDescription = await generateMealDescriptionFromImage(imageBase64);
+        if (imageDescription) {
+          entryText = imageDescription;
+        } else {
+          entryText = 'Meal from image';
+        }
+      }
+      const newEntry: LogEntry = {
+        id: Date.now().toString(),
+        text: entryText || (imageBase64 ? 'Meal from image' : 'Logged Meal'),
+        calories: caloriesNum,
+        timestamp: Date.now(),
+      };
+      setLog(prevLog => [newEntry, ...prevLog]);
+      setConsumedCalories(prev => prev + caloriesNum);
+      setIsLoading(false);
+      setMealInput('');
+      setManualCalories('');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
     let promptContent: OpenAIPromptContent[] = [];
     const systemMessage = "You are a calorie estimation assistant. Your task is to estimate the calories in the provided meal description or image. Respond with ONLY the numerical value of the estimated calories. For example, if you estimate 350 calories, respond with '350'. Do not include units like 'calories' or 'kcal' or any other descriptive text. If you cannot estimate, respond with '0'.";
     if (text) {
@@ -283,6 +315,7 @@ export default function HomePage() {
     }
     setIsLoading(false);
     setMealInput('');
+    setManualCalories('');
     if (fileInputRef.current) {
         fileInputRef.current.value = '';
     }
@@ -374,6 +407,16 @@ export default function HomePage() {
           placeholder="e.g., 'Chicken salad with avocado' or upload a photo..."
           value={mealInput}
           onChange={(e) => setMealInput(e.target.value)}
+          disabled={isLoading}
+        />
+        <input
+          type="number"
+          min="0"
+          step="1"
+          className="w-full p-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-700 placeholder-slate-400"
+          placeholder="Calories (optional, e.g. 350)"
+          value={manualCalories}
+          onChange={e => setManualCalories(e.target.value)}
           disabled={isLoading}
         />
         <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
@@ -511,7 +554,7 @@ export default function HomePage() {
         <p>CalorieTrack &copy; {new Date().getFullYear()}</p>
         <p className="mt-1">Remember to set your <code className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md text-xs">NEXT_PUBLIC_OPENAI_KEY</code> environment variable.</p>
         <p className="mt-3 text-xs italic text-slate-400">
-          Disclaimer: AI-powered calorie estimates are for informational purposes only and may not be 100% accurate. Consult with a nutritionist or healthcare provider for precise dietary advice.
+          Disclaimer: Our AI tries its best, but sometimes it thinks a salad is a cheeseburger. Calorie estimates may be wildly optimistic, pessimistic, or just plain confused. For actual health advice, consult a real human (preferably one with a degree, not just a strong opinion about kale).
         </p>
       </footer>
     </div>
