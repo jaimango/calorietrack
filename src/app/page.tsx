@@ -2,6 +2,28 @@
 'use client';
 
 import React, { useState, useEffect, useRef, ChangeEvent } from 'react';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  ChartData,
+} from 'chart.js';
+import { Line } from 'react-chartjs-2';
+
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend
+);
 
 const DEFAULT_DAILY_GOAL = 2000;
 const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_KEY;
@@ -109,6 +131,62 @@ const resizeImage = (file: File, maxSize = 512): Promise<string> => {
     reader.onerror = reject;
     reader.readAsDataURL(file);
   });
+};
+
+// Add this new component before the HomePage component
+const CalorieHistoryGraph = ({ history }: { history: DailyHistoryEntry[] }) => {
+  // Sort history by date ascending for the graph
+  const sortedHistory = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  
+  const data: ChartData<'line'> = {
+    labels: sortedHistory.map(entry => new Date(entry.date).toLocaleDateString([], { month: 'short', day: 'numeric' })),
+    datasets: [
+      {
+        label: 'Calories Consumed',
+        data: sortedHistory.map(entry => entry.totalCalories),
+        borderColor: 'rgb(14, 165, 233)', // sky-500
+        backgroundColor: 'rgba(14, 165, 233, 0.5)',
+        tension: 0.4,
+      },
+      {
+        label: 'Daily Goal',
+        data: sortedHistory.map(entry => entry.dailyGoalAtTheTime),
+        borderColor: 'rgb(148, 163, 184)', // slate-400
+        backgroundColor: 'rgba(148, 163, 184, 0.5)',
+        borderDash: [5, 5],
+        tension: 0,
+      },
+    ],
+  };
+
+  const options = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'top' as const,
+      },
+      title: {
+        display: true,
+        text: 'Calorie Intake History',
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: 'Calories',
+        },
+      },
+    },
+  };
+
+  return (
+    <div className="w-full h-64 mb-6">
+      <Line data={data} options={options} />
+    </div>
+  );
 };
 
 export default function HomePage() {
@@ -590,38 +668,41 @@ export default function HomePage() {
             {calorieHistory.length === 0 ? (
               <p className="text-slate-500 text-center py-4">No history recorded yet.</p>
             ) : (
-              calorieHistory.map((day) => (
-                <div key={day.date} className="p-5 bg-white rounded-xl shadow-lg">
-                  <div 
-                    className="flex justify-between items-center cursor-pointer" 
-                    onClick={() => setExpandedHistoryDate(expandedHistoryDate === day.date ? null : day.date)}
-                  >
-                    <div>
-                      <h3 className="text-xl font-semibold text-cyan-700">{new Date(day.date + 'T00:00:00').toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })}</h3>
-                      <p className="text-sm text-slate-600">Total: {day.totalCalories} kcal (Goal: {day.dailyGoalAtTheTime} kcal)</p>
+              <>
+                <CalorieHistoryGraph history={calorieHistory} />
+                {calorieHistory.map((day) => (
+                  <div key={day.date} className="p-5 bg-white rounded-xl shadow-lg">
+                    <div 
+                      className="flex justify-between items-center cursor-pointer" 
+                      onClick={() => setExpandedHistoryDate(expandedHistoryDate === day.date ? null : day.date)}
+                    >
+                      <div>
+                        <h3 className="text-xl font-semibold text-cyan-700">{new Date(day.date + 'T00:00:00').toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })}</h3>
+                        <p className="text-sm text-slate-600">Total: {day.totalCalories} kcal (Goal: {day.dailyGoalAtTheTime} kcal)</p>
+                      </div>
+                      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-5 h-5 transition-transform duration-300 ${expandedHistoryDate === day.date ? 'rotate-180' : ''}`}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                      </svg>
                     </div>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-5 h-5 transition-transform duration-300 ${expandedHistoryDate === day.date ? 'rotate-180' : ''}`}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                    </svg>
+                    {expandedHistoryDate === day.date && (
+                      <ul className="mt-4 space-y-2.5 pl-2 border-l-2 border-slate-200 ml-1">
+                        {day.mealLog.filter(entry => entry.text !== 'Daily Reset for new day').map((entry) => (
+                          <li key={entry.id} className="p-2.5 bg-slate-50 rounded-lg shadow-sm flex justify-between items-center text-sm">
+                            <div>
+                              <p className="font-medium text-slate-700">{entry.text}</p>
+                              <p className="text-xs text-slate-500">{new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                            </div>
+                            <span className="font-medium text-cyan-600">{entry.calories} kcal</span>
+                          </li>
+                        ))}
+                        {day.mealLog.filter(entry => entry.text !== 'Daily Reset for new day').length === 0 && (
+                          <li className="text-slate-400 text-xs italic">No meals logged for this day.</li>
+                        )}
+                      </ul>
+                    )}
                   </div>
-                  {expandedHistoryDate === day.date && (
-                    <ul className="mt-4 space-y-2.5 pl-2 border-l-2 border-slate-200 ml-1">
-                      {day.mealLog.filter(entry => entry.text !== 'Daily Reset for new day').map((entry) => (
-                        <li key={entry.id} className="p-2.5 bg-slate-50 rounded-lg shadow-sm flex justify-between items-center text-sm">
-                          <div>
-                            <p className="font-medium text-slate-700">{entry.text}</p>
-                            <p className="text-xs text-slate-500">{new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
-                          </div>
-                          <span className="font-medium text-cyan-600">{entry.calories} kcal</span>
-                        </li>
-                      ))}
-                      {day.mealLog.filter(entry => entry.text !== 'Daily Reset for new day').length === 0 && (
-                        <li className="text-slate-400 text-xs italic">No meals logged for this day.</li>
-                      )}
-                    </ul>
-                  )}
-                </div>
-              ))
+                ))}
+              </>
             )}
           </div>
         )}
