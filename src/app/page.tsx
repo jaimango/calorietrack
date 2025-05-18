@@ -12,7 +12,6 @@ import {
   Tooltip,
   Legend,
   ChartData,
-  ChartOptions
 } from 'chart.js';
 import { Line } from 'react-chartjs-2';
 import { DateTime } from 'luxon';
@@ -34,7 +33,7 @@ interface LogEntry {
   id: string;
   text: string;
   calories: number;
-  timestamp: string; // Changed from number to string to store ISO format
+  timestamp: number;
 }
 
 // New interface for daily history entries
@@ -199,87 +198,319 @@ export default function HomePage() {
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [calorieHistory, setCalorieHistory] = useState<DailyHistoryEntry[]>([]);
-  const [showHistory, setShowHistory] = useState<boolean>(false);
+  const [calorieHistory, setCalorieHistory] = useState<DailyHistoryEntry[]>([]); // State for history
+  const [showHistory, setShowHistory] = useState<boolean>(false); // State to toggle history view
   const [expandedHistoryDate, setExpandedHistoryDate] = useState<string | null>(null);
-  const [manualCalories, setManualCalories] = useState<string>('');
-  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [manualCalories, setManualCalories] = useState<string>(''); // New state for manual calorie input
 
-  // Add function to check if date has changed
-  const checkDateChange = (lastSavedDate: string) => {
-    const today = DateTime.now().toISODate();
-    return today !== lastSavedDate;
+  // Load data from localStorage on initial render and check for date change
+  useEffect(() => {
+    const storedDailyGoal = localStorage.getItem('dailyGoal');
+    if (storedDailyGoal) setDailyGoal(JSON.parse(storedDailyGoal));
+    const storedCalories = localStorage.getItem('consumedCalories');
+    if (storedCalories) setConsumedCalories(JSON.parse(storedCalories));
+    const storedLog = localStorage.getItem('calorieLog');
+    if (storedLog) setLog(JSON.parse(storedLog));
+    const storedHistory = localStorage.getItem('calorieHistory');
+    if (storedHistory) setCalorieHistory(JSON.parse(storedHistory));
+
+    // --- Updated: Date check using Luxon ---
+    const getFormattedDate = (date: DateTime): string => date.toFormat('yyyy-MM-dd');
+    const today = DateTime.now();
+    const todayStr = getFormattedDate(today);
+    
+    const lastLog = storedLog ? JSON.parse(storedLog) : [];
+    // Find the most recent non-reset log entry
+    const lastEntry = lastLog.find((entry: any) => entry.text !== 'Daily Reset for new day');
+    let lastEntryDate = null;
+    if (lastEntry) {
+      lastEntryDate = getFormattedDate(DateTime.fromMillis(lastEntry.timestamp));
+    }
+    // If there are no entries, or the last entry is from a previous day, trigger a reset
+    if (lastEntryDate && lastEntryDate !== todayStr) {
+      // Save yesterday's log to history
+      const storedCaloriesNum = storedCalories ? JSON.parse(storedCalories) : 0;
+      const storedDailyGoalNum = storedDailyGoal ? JSON.parse(storedDailyGoal) : dailyGoal;
+      const newHistoryEntry = {
+        date: lastEntryDate,
+        totalCalories: storedCaloriesNum,
+        mealLog: lastLog.filter((entry: any) => entry.text !== 'Daily Reset for new day'),
+        dailyGoalAtTheTime: storedDailyGoalNum,
+      };
+      const prevHistory = storedHistory ? JSON.parse(storedHistory) : [];
+      const filteredHistory = prevHistory.filter((entry: any) => entry.date !== lastEntryDate);
+      const updatedHistory = [newHistoryEntry, ...filteredHistory].sort((a, b) => 
+        DateTime.fromFormat(b.date, 'yyyy-MM-dd').toMillis() - DateTime.fromFormat(a.date, 'yyyy-MM-dd').toMillis()
+      );
+      setCalorieHistory(updatedHistory);
+      localStorage.setItem('calorieHistory', JSON.stringify(updatedHistory));
+      // Reset log and calories for today
+      setConsumedCalories(0);
+      setLog([
+        {
+          id: DateTime.now().toMillis().toString(),
+          text: 'Daily Reset for new day',
+          calories: 0,
+          timestamp: DateTime.now().toMillis(),
+        },
+      ]);
+      localStorage.setItem('consumedCalories', '0');
+      localStorage.setItem('calorieLog', JSON.stringify([
+        {
+          id: DateTime.now().toMillis().toString(),
+          text: 'Daily Reset for new day',
+          calories: 0,
+          timestamp: DateTime.now().toMillis(),
+        },
+      ]));
+    }
+  }, []);
+
+  // Save data to localStorage whenever states change
+  useEffect(() => {
+    localStorage.setItem('dailyGoal', JSON.stringify(dailyGoal));
+  }, [dailyGoal]);
+
+  useEffect(() => {
+    localStorage.setItem('consumedCalories', JSON.stringify(consumedCalories));
+  }, [consumedCalories]);
+
+  useEffect(() => {
+    localStorage.setItem('calorieLog', JSON.stringify(log));
+  }, [log]);
+
+  useEffect(() => {
+    localStorage.setItem('calorieHistory', JSON.stringify(calorieHistory));
+  }, [calorieHistory]);
+
+  // Reset at midnight and save daily summary
+  useEffect(() => {
+    const getFormattedDate = (date: DateTime): string => {
+      return date.toFormat('yyyy-MM-dd');
+    };
+
+    const checkMidnight = () => {
+      const now = DateTime.now();
+      const tomorrow = now.plus({ days: 1 }).startOf('day');
+      const timeToMidnight = tomorrow.toMillis() - now.toMillis();
+
+      const timerId = setTimeout(() => {
+        // Save the current day's summary before resetting
+        const todayStr = getFormattedDate(now);
+        // Avoid saving if no calories were consumed or if a summary for today already exists
+        if (consumedCalories > 0 || log.length > 0) {
+          const newHistoryEntry: DailyHistoryEntry = {
+            date: todayStr,
+            totalCalories: consumedCalories,
+            mealLog: log,
+            dailyGoalAtTheTime: dailyGoal,
+          };
+
+          setCalorieHistory(prevHistory => {
+            // Filter out any existing entry for the same date to prevent duplicates
+            const filteredHistory = prevHistory.filter(entry => entry.date !== todayStr);
+            return [newHistoryEntry, ...filteredHistory].sort((a, b) => 
+              DateTime.fromFormat(b.date, 'yyyy-MM-dd').toMillis() - DateTime.fromFormat(a.date, 'yyyy-MM-dd').toMillis()
+            );
+          });
+        }
+        
+        // Reset for the new day
+        setConsumedCalories(0);
+        setLog([
+          {
+            id: DateTime.now().toMillis().toString(),
+            text: 'Daily Reset for new day',
+            calories: 0,
+            timestamp: DateTime.now().toMillis(),
+          },
+        ]);
+        
+        checkMidnight(); // Schedule the next check
+      }, timeToMidnight);
+
+      return () => clearTimeout(timerId);
+    };
+
+    const clearTimer = checkMidnight();
+    return clearTimer;
+  }, [consumedCalories, log, dailyGoal]);
+
+  const parseCaloriesFromResponse = (responseText: string): number | null => {
+    console.log('OpenAI Response for parsing:', responseText);
+    const specificPattern = /(\d+)\s*(?:calories|kcal)/i;
+    const specificMatch = responseText.match(specificPattern);
+    if (specificMatch && specificMatch[1]) {
+      return parseInt(specificMatch[1], 10);
+    }
+    const generalNumberPattern = /\b(\d+)\b/;
+    const generalMatch = responseText.match(generalNumberPattern);
+    if (generalMatch && generalMatch[1]) {
+      const potentialCalories = parseInt(generalMatch[1], 10);
+      if (potentialCalories > 0 && potentialCalories < 5000) {
+        return potentialCalories;
+      }
+    }
+    const anyDigitsPattern = /(\d+)/;
+    const anyDigitsMatch = responseText.match(anyDigitsPattern);
+    if (anyDigitsMatch && anyDigitsMatch[1]) {
+        const potentialCalories = parseInt(anyDigitsMatch[1], 10);
+        if (potentialCalories > 0 && potentialCalories < 5000) {
+            return potentialCalories;
+        }
+    }
+    console.warn('Could not parse a calorie number from response:', responseText);
+    return null;
   };
 
-  // Add function to get calories (placeholder for your existing calorie calculation logic)
-  const getCalories = async (mealInput: string): Promise<number> => {
-    // This should be replaced with your actual calorie calculation logic
-    return 0;
-  };
-
-  // Modify loadData to handle date change
-  const loadData = async () => {
+  const handleMealSubmit = async (text: string, imageBase64?: string) => {
+    if (!OPENAI_API_KEY && !manualCalories) {
+      setError(
+        'OpenAI API key is not configured. Please set NEXT_PUBLIC_OPENAI_KEY in your .env.local file.'
+      );
+      setIsLoading(false);
+      return;
+    }
+    if (!text && !imageBase64) return;
     setIsLoading(true);
     setError(null);
-    try {
-      const response = await fetch('/api/calories');
-      if (!response.ok) {
-        throw new Error('Failed to load data');
-      }
-      const data = await response.json();
-      
-      // Check if date has changed
-      if (data.lastSavedDate && checkDateChange(data.lastSavedDate)) {
-        // Reset calories for new day
-        setConsumedCalories(0);
-        setLog([]);
-        // Save the reset state
-        await fetch('/api/calories', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            consumedCalories: 0,
-            log: [],
-            lastSavedDate: DateTime.now().toISODate()
-          })
-        });
-      } else {
-        setConsumedCalories(data.consumedCalories || 0);
-        setLog(data.log || []);
-      }
-      
-      setDailyGoal(data.dailyGoal || DEFAULT_DAILY_GOAL);
-      setCalorieHistory(data.calorieHistory || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data');
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
-  // Modify saveData to include lastSavedDate
-  const saveData = async (newConsumedCalories: number, newLog: LogEntry[]) => {
+    // If user provided calories, use them directly
+    if (manualCalories.trim() !== '' && !isNaN(Number(manualCalories))) {
+      const caloriesNum = Math.max(0, Math.round(Number(manualCalories)));
+      let entryText = text.trim();
+      if (imageBase64 && !entryText) {
+        setIsLoading(true);
+        const imageDescription = await generateMealDescriptionFromImage(imageBase64);
+        if (imageDescription) {
+          entryText = imageDescription;
+        } else {
+          entryText = 'Meal from image';
+        }
+      }
+      const newEntry: LogEntry = {
+        id: DateTime.now().toMillis().toString(),
+        text: entryText || (imageBase64 ? 'Meal from image' : 'Logged Meal'),
+        calories: caloriesNum,
+        timestamp: DateTime.now().toMillis(),
+      };
+      setLog(prevLog => [newEntry, ...prevLog]);
+      setConsumedCalories(prev => prev + caloriesNum);
+      setIsLoading(false);
+      setMealInput('');
+      setManualCalories('');
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+      return;
+    }
+
+    let promptContent: OpenAIPromptContent[] = [];
+    const systemMessage = "You are a calorie estimation assistant. Your task is to estimate the calories in the provided meal description or image. Respond with ONLY the numerical value of the estimated calories. For example, if you estimate 350 calories, respond with '350'. Do not include units like 'calories' or 'kcal' or any other descriptive text. If you cannot estimate, respond with '0'.";
+    if (text) {
+      promptContent.push({ type: 'text', text: `Meal: ${text}` });
+    }
+    if (imageBase64) {
+      promptContent.push({
+        type: 'image_url',
+        image_url: { url: imageBase64 },
+      });
+      if (!text) {
+        promptContent.unshift({ type: 'text', text: "Estimate calories for the following image:"});
+      }
+    }
     try {
-      const response = await fetch('/api/calories', {
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${OPENAI_API_KEY}`,
+        },
         body: JSON.stringify({
-          consumedCalories: newConsumedCalories,
-          log: newLog,
-          dailyGoal,
-          lastSavedDate: DateTime.now().toISODate()
-        })
+          model: 'gpt-4o',
+          messages: [
+            { role: 'system', content: systemMessage },
+            {
+              role: 'user',
+              content: promptContent,
+            },
+          ],
+          max_tokens: 15, 
+          temperature: 0.2,
+        }),
       });
       if (!response.ok) {
-        throw new Error('Failed to save data');
+        const errorData = await response.json();
+        console.error('OpenAI API Error:', errorData);
+        throw new Error(errorData.error?.message || 'Failed to fetch calorie estimate');
+      }
+      const data = await response.json();
+      const choice = data.choices?.[0]?.message?.content;
+      if (choice) {
+        const estimatedCalories = parseCaloriesFromResponse(choice);
+        if (estimatedCalories !== null) {
+          let entryText = text.trim();
+          if (imageBase64 && !entryText) {
+            setIsLoading(true); 
+            const imageDescription = await generateMealDescriptionFromImage(imageBase64);
+            if (imageDescription) {
+              entryText = imageDescription;
+            } else {
+              entryText = 'Meal from image';
+            }
+          }
+          const newEntry: LogEntry = {
+            id: DateTime.now().toMillis().toString(),
+            text: entryText || (imageBase64 ? 'Meal from image' : 'Logged Meal'),
+            calories: estimatedCalories,
+            timestamp: DateTime.now().toMillis(),
+          };
+          setLog(prevLog => [newEntry, ...prevLog]);
+          setConsumedCalories(prev => prev + estimatedCalories);
+        } else {
+          setError('Could not parse calorie estimate from response: ' + choice);
+        }
+      } else {
+        setError('No response content from OpenAI.');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save data');
+      console.error(err);
+      setError(err instanceof Error ? err.message : 'An unknown error occurred');
+    }
+    setIsLoading(false);
+    setMealInput('');
+    setManualCalories('');
+    if (fileInputRef.current) {
+        fileInputRef.current.value = '';
     }
   };
 
-  // Add handleDailyGoalChange
-  const handleDailyGoalChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleTextSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mealInput.trim()) {
+      handleMealSubmit(mealInput.trim());
+    }
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      try {
+        setIsLoading(true);
+        const base64String = await resizeImage(file, 512); // Resize before sending
+        handleMealSubmit(mealInput.trim(), base64String);
+      } catch (err) {
+        setError('Failed to process image.');
+        setIsLoading(false);
+      }
+    } else {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const handleDailyGoalChange = (e: ChangeEvent<HTMLInputElement>) => {
     const newGoal = parseInt(e.target.value, 10);
     if (!isNaN(newGoal) && newGoal > 0) {
       setDailyGoal(newGoal);
@@ -288,7 +519,6 @@ export default function HomePage() {
     }
   };
 
-  // Add handleDeleteLogEntry
   const handleDeleteLogEntry = (entryId: string) => {
     const entryToDelete = log.find(entry => entry.id === entryId);
     if (entryToDelete) {
@@ -297,55 +527,7 @@ export default function HomePage() {
     }
   };
 
-  // Add handleImageUpload
-  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      try {
-        setIsLoading(true);
-        const base64String = await resizeImage(file, 512);
-        // Handle the image upload logic here
-        setIsLoading(false);
-      } catch (err) {
-        setError('Failed to process image.');
-        setIsLoading(false);
-      }
-    }
-  };
-
-  // Calculate progress percentage
   const progressPercentage = Math.min((consumedCalories / dailyGoal) * 100, 100);
-
-  // Add handleTextSubmit
-  const handleTextSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!mealInput.trim() && !manualCalories.trim()) return;
-
-    const calories = manualCalories.trim() 
-      ? parseInt(manualCalories, 10)
-      : await getCalories(mealInput);
-
-    if (isNaN(calories)) {
-      setError('Failed to get calories. Please try again.');
-      return;
-    }
-
-    const newConsumedCalories = consumedCalories + calories;
-    const newLog = [...log, {
-      id: Date.now().toString(),
-      text: mealInput.trim() || `Manual entry: ${calories} calories`,
-      calories,
-      timestamp: DateTime.now().toISO()
-    }];
-
-    setConsumedCalories(newConsumedCalories);
-    setLog(newLog);
-    setMealInput('');
-    setManualCalories('');
-    setError(null);
-
-    await saveData(newConsumedCalories, newLog);
-  };
 
   return (
     <div className="min-h-screen flex flex-col items-center p-4 pt-10 max-w-md mx-auto">
@@ -501,13 +683,11 @@ export default function HomePage() {
                       onClick={() => setExpandedHistoryDate(expandedHistoryDate === day.date ? null : day.date)}
                     >
                       <div>
-                        <h3 className="text-xl font-semibold text-cyan-700">
-                          {DateTime.fromISO(day.date).toLocaleString(DateTime.DATE_FULL)}
-                        </h3>
+                        <h3 className="text-xl font-semibold text-cyan-700">{new Date(day.date + 'T00:00:00').toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })}</h3>
                         <p className="text-sm text-slate-600">Total: {day.totalCalories} kcal (Goal: {day.dailyGoalAtTheTime} kcal)</p>
                       </div>
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-5 h-5 transition-transform duration-300 ${expandedHistoryDate === day.date ? 'rotate-180' : ''}`}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
+                          <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
                       </svg>
                     </div>
                     {expandedHistoryDate === day.date && (
@@ -516,9 +696,7 @@ export default function HomePage() {
                           <li key={entry.id} className="p-2.5 bg-slate-50 rounded-lg shadow-sm flex justify-between items-center text-sm">
                             <div>
                               <p className="font-medium text-slate-700">{entry.text}</p>
-                              <p className="text-xs text-slate-500">
-                                {DateTime.fromISO(entry.timestamp).toLocaleString(DateTime.TIME_SIMPLE)}
-                              </p>
+                              <p className="text-xs text-slate-500">{new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                             </div>
                             <span className="font-medium text-cyan-600">{entry.calories} kcal</span>
                           </li>
