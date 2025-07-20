@@ -8,7 +8,7 @@ const poppins = Poppins({
 });
 
 export const metadata: Metadata = {
-  title: 'Calorie Tracker',
+  title: 'Intake',
   description: 'A simple calorie tracking app',
 };
 

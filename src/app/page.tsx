@@ -574,7 +574,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col items-center p-4 pt-10 max-w-md mx-auto">
       <header className="w-full mb-10 text-center">
-        <h1 className="text-5xl font-bold text-cyan-700">Calorie<span className="font-light">Track</span></h1>
+        <h1 className="text-5xl font-bold text-cyan-700">Intake</h1>
         <div className="mt-4 flex items-center justify-center">
             <p className="text-slate-600 mr-2">Daily Goal:</p>
             <input 
@@ -782,7 +782,7 @@ export default function HomePage() {
       </div>
 
       <footer className="w-full mt-16 text-center text-slate-500 text-xs">
-        <p>CalorieTrack &copy; {new Date().getFullYear()}</p>
+        <p>Intake &copy; {new Date().getFullYear()}</p>
         <p className="mt-1">Remember to set your <code className="bg-slate-200 text-slate-700 px-1.5 py-0.5 rounded-md text-xs">NEXT_PUBLIC_OPENAI_KEY</code> environment variable.</p>
         <p className="mt-3 text-xs italic text-slate-400">
           Disclaimer: Our AI tries its best, but sometimes it thinks a salad is a cheeseburger. Calorie estimates may be wildly optimistic, pessimistic, or just plain confused. For actual health advice, consult a real human (preferably one with a degree, not just a strong opinion about kale).

@@ -1,6 +1,6 @@
-# CalorieTrack - AI-Powered Calorie Tracking App
+# Intake - AI-Powered Calorie Tracking App
 
-CalorieTrack is a mobile-friendly web application designed to help users easily track their daily calorie intake. It leverages AI to estimate calories from meal descriptions or photos, providing a modern and intuitive user experience.
+Intake is a mobile-friendly web application designed to help users easily track their daily calorie intake. It leverages AI to estimate calories from meal descriptions or photos, providing a modern and intuitive user experience.
 
 ## Key Features
 
@@ -56,7 +56,7 @@ CalorieTrack is a mobile-friendly web application designed to help users easily 
 1.  **Clone the repository:**
     ```bash
     git clone <repository-url>
-    cd calorietrack 
+    cd intake 
     ```
 
 2.  **Install dependencies:**
