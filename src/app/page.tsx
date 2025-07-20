@@ -527,6 +527,31 @@ export default function HomePage() {
     }
   };
 
+  const handleDuplicateLogEntry = (entryId: string) => {
+    const entryToDuplicate = log.find(entry => entry.id === entryId);
+    if (entryToDuplicate) {
+      const newEntry: LogEntry = {
+        id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+        text: entryToDuplicate.text,
+        calories: entryToDuplicate.calories,
+        timestamp: Date.now(),
+      };
+      setLog(prevLog => [...prevLog, newEntry]);
+      setConsumedCalories(prevCalories => prevCalories + newEntry.calories);
+    }
+  };
+
+  const handleDuplicateFromHistory = (entry: LogEntry) => {
+    const newEntry: LogEntry = {
+      id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
+      text: entry.text,
+      calories: entry.calories,
+      timestamp: Date.now(),
+    };
+    setLog(prevLog => [...prevLog, newEntry]);
+    setConsumedCalories(prevCalories => prevCalories + newEntry.calories);
+  };
+
   const progressPercentage = Math.min((consumedCalories / dailyGoal) * 100, 100);
 
   return (
@@ -640,15 +665,26 @@ export default function HomePage() {
                   <p className="text-xs text-slate-500">{new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                 </div>
                 <span className="font-semibold text-lg text-cyan-600 mr-3">{entry.calories} kcal</span>
-                <button 
-                  onClick={() => handleDeleteLogEntry(entry.id)}
-                  className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors duration-150"
-                  aria-label="Delete meal entry"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                <div className="flex items-center space-x-1">
+                  <button 
+                    onClick={() => handleDuplicateLogEntry(entry.id)}
+                    className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded-full transition-colors duration-150"
+                    aria-label="Duplicate meal entry"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                    </svg>
+                  </button>
+                  <button 
+                    onClick={() => handleDeleteLogEntry(entry.id)}
+                    className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors duration-150"
+                    aria-label="Delete meal entry"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
@@ -694,11 +730,23 @@ export default function HomePage() {
                       <ul className="mt-4 space-y-2.5 pl-2 border-l-2 border-slate-200 ml-1">
                         {day.mealLog.filter(entry => entry.text !== 'Daily Reset for new day').map((entry) => (
                           <li key={entry.id} className="p-2.5 bg-slate-50 rounded-lg shadow-sm flex justify-between items-center text-sm">
-                            <div>
+                            <div className="flex-grow">
                               <p className="font-medium text-slate-700">{entry.text}</p>
                               <p className="text-xs text-slate-500">{new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
                             </div>
-                            <span className="font-medium text-cyan-600">{entry.calories} kcal</span>
+                            <div className="flex items-center space-x-2">
+                              <span className="font-medium text-cyan-600">{entry.calories} kcal</span>
+                              <button 
+                                onClick={() => handleDuplicateFromHistory(entry)}
+                                className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded-full transition-colors duration-150"
+                                aria-label="Duplicate meal entry to today"
+                                title="Add to today's log"
+                              >
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                </svg>
+                              </button>
+                            </div>
                           </li>
                         ))}
                         {day.mealLog.filter(entry => entry.text !== 'Daily Reset for new day').length === 0 && (
