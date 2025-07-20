@@ -29,11 +29,30 @@ ChartJS.register(
 const DEFAULT_DAILY_GOAL = 2000;
 const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_KEY;
 
-// Ideal macro percentages (commonly recommended ranges)
-const IDEAL_MACRO_PERCENTAGES = {
-  carbs: 45, // 45% of calories from carbs
-  protein: 25, // 25% of calories from protein  
-  fat: 30, // 30% of calories from fat
+// Profile types and their ideal macro percentages
+type ProfileType = 'General' | 'Weight Loss' | 'Muscle Building' | 'Endurance Athletes';
+
+const PROFILE_MACRO_PERCENTAGES: Record<ProfileType, { carbs: number; protein: number; fat: number }> = {
+  'General': {
+    carbs: 45, // 45% of calories from carbs
+    protein: 25, // 25% of calories from protein  
+    fat: 30, // 30% of calories from fat
+  },
+  'Weight Loss': {
+    carbs: 35, // Lower carbs for weight loss
+    protein: 35, // Higher protein to preserve muscle
+    fat: 30, // Moderate fat
+  },
+  'Muscle Building': {
+    carbs: 40, // Moderate carbs for energy
+    protein: 35, // High protein for muscle synthesis
+    fat: 25, // Lower fat to prioritize protein
+  },
+  'Endurance Athletes': {
+    carbs: 55, // High carbs for endurance performance
+    protein: 20, // Moderate protein
+    fat: 25, // Lower fat
+  },
 };
 
 interface MacroData {
@@ -209,6 +228,7 @@ export default function HomePage() {
   const [dailyGoalInput, setDailyGoalInput] = useState<string>(DEFAULT_DAILY_GOAL.toString());
   const [consumedCalories, setConsumedCalories] = useState<number>(0);
   const [consumedMacros, setConsumedMacros] = useState<MacroData>({ carbs: 0, protein: 0, fat: 0 });
+  const [selectedProfile, setSelectedProfile] = useState<ProfileType>('General');
   const [mealInput, setMealInput] = useState<string>('');
   const [log, setLog] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -226,6 +246,10 @@ export default function HomePage() {
       const goal = JSON.parse(storedDailyGoal);
       setDailyGoal(goal);
       setDailyGoalInput(goal.toString());
+    }
+    const storedProfile = localStorage.getItem('selectedProfile');
+    if (storedProfile) {
+      setSelectedProfile(JSON.parse(storedProfile) as ProfileType);
     }
     const storedCalories = localStorage.getItem('consumedCalories');
     if (storedCalories) setConsumedCalories(JSON.parse(storedCalories));
@@ -314,6 +338,10 @@ export default function HomePage() {
   useEffect(() => {
     localStorage.setItem('dailyGoal', JSON.stringify(dailyGoal));
   }, [dailyGoal]);
+
+  useEffect(() => {
+    localStorage.setItem('selectedProfile', JSON.stringify(selectedProfile));
+  }, [selectedProfile]);
 
   useEffect(() => {
     localStorage.setItem('consumedCalories', JSON.stringify(consumedCalories));
@@ -675,6 +703,9 @@ export default function HomePage() {
 
   const macroPercentages = getMacroPercentages();
 
+  // Get the ideal macro percentages for the selected profile
+  const getIdealMacroPercentages = () => PROFILE_MACRO_PERCENTAGES[selectedProfile];
+
   // Calculate total macros for a day's meals
   const getDayMacros = (mealLog: LogEntry[]): MacroData => {
     return mealLog.filter(entry => entry.text !== 'Daily Reset for new day').reduce(
@@ -744,7 +775,7 @@ export default function HomePage() {
           <div>
             <div className="flex justify-between text-sm text-slate-600 mb-1">
               <span>Carbs ({consumedMacros.carbs}g)</span>
-              <span>{macroPercentages.carbs}% (ideal: {IDEAL_MACRO_PERCENTAGES.carbs}%)</span>
+              <span>{macroPercentages.carbs}% (ideal: {getIdealMacroPercentages().carbs}%)</span>
             </div>
             <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner overflow-hidden">
               <div
@@ -758,7 +789,7 @@ export default function HomePage() {
           <div>
             <div className="flex justify-between text-sm text-slate-600 mb-1">
               <span>Protein ({consumedMacros.protein}g)</span>
-              <span>{macroPercentages.protein}% (ideal: {IDEAL_MACRO_PERCENTAGES.protein}%)</span>
+              <span>{macroPercentages.protein}% (ideal: {getIdealMacroPercentages().protein}%)</span>
             </div>
             <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner overflow-hidden">
               <div
@@ -772,7 +803,7 @@ export default function HomePage() {
           <div>
             <div className="flex justify-between text-sm text-slate-600 mb-1">
               <span>Fat ({consumedMacros.fat}g)</span>
-              <span>{macroPercentages.fat}% (ideal: {IDEAL_MACRO_PERCENTAGES.fat}%)</span>
+              <span>{macroPercentages.fat}% (ideal: {getIdealMacroPercentages().fat}%)</span>
             </div>
             <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner overflow-hidden">
               <div
@@ -940,7 +971,7 @@ export default function HomePage() {
                             Macros: C: {dayMacroPercentages.carbs}% ({dayMacros.carbs}g) • P: {dayMacroPercentages.protein}% ({dayMacros.protein}g) • F: {dayMacroPercentages.fat}% ({dayMacros.fat}g)
                           </p>
                         )}
-                        <p className="text-xs text-slate-400 mt-1">Ideal: C: {IDEAL_MACRO_PERCENTAGES.carbs}% • P: {IDEAL_MACRO_PERCENTAGES.protein}% • F: {IDEAL_MACRO_PERCENTAGES.fat}%</p>
+                        <p className="text-xs text-slate-400 mt-1">Ideal: C: {getIdealMacroPercentages().carbs}% • P: {getIdealMacroPercentages().protein}% • F: {getIdealMacroPercentages().fat}%</p>
                       </div>
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-5 h-5 transition-transform duration-300 ${expandedHistoryDate === day.date ? 'rotate-180' : ''}`}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
@@ -991,6 +1022,39 @@ export default function HomePage() {
             )}
           </div>
         )}
+      </div>
+
+      {/* Macro Profile Selection */}
+      <div className="w-full mb-10">
+        <h3 className="text-lg font-semibold text-slate-700 mb-3">Macro Profile</h3>
+        <p className="text-sm text-slate-600 mb-4">Choose your nutrition goal to adjust ideal macro percentages:</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {(Object.keys(PROFILE_MACRO_PERCENTAGES) as ProfileType[]).map((profile) => {
+            const macros = PROFILE_MACRO_PERCENTAGES[profile];
+            return (
+              <button
+                key={profile}
+                onClick={() => setSelectedProfile(profile)}
+                className={`p-4 rounded-lg border-2 transition-all duration-200 text-left ${
+                  selectedProfile === profile
+                    ? 'border-cyan-500 bg-cyan-50 text-cyan-800'
+                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                <div className="font-semibold text-base mb-1">{profile}</div>
+                <div className="text-xs text-slate-500">
+                  C: {macros.carbs}% • P: {macros.protein}% • F: {macros.fat}%
+                </div>
+                <div className="text-xs text-slate-400 mt-1">
+                  {profile === 'General' && 'Balanced nutrition for overall health'}
+                  {profile === 'Weight Loss' && 'Higher protein, lower carbs'}
+                  {profile === 'Muscle Building' && 'High protein for muscle growth'}
+                  {profile === 'Endurance Athletes' && 'High carbs for sustained energy'}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       <footer className="w-full mt-16 text-center text-slate-500 text-xs">
