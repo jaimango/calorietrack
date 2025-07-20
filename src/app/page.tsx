@@ -192,6 +192,7 @@ const CalorieHistoryGraph = ({ history }: { history: DailyHistoryEntry[] }) => {
 
 export default function HomePage() {
   const [dailyGoal, setDailyGoal] = useState<number>(DEFAULT_DAILY_GOAL);
+  const [dailyGoalInput, setDailyGoalInput] = useState<string>(DEFAULT_DAILY_GOAL.toString());
   const [consumedCalories, setConsumedCalories] = useState<number>(0);
   const [mealInput, setMealInput] = useState<string>('');
   const [log, setLog] = useState<LogEntry[]>([]);
@@ -206,7 +207,11 @@ export default function HomePage() {
   // Load data from localStorage on initial render and check for date change
   useEffect(() => {
     const storedDailyGoal = localStorage.getItem('dailyGoal');
-    if (storedDailyGoal) setDailyGoal(JSON.parse(storedDailyGoal));
+    if (storedDailyGoal) {
+      const goal = JSON.parse(storedDailyGoal);
+      setDailyGoal(goal);
+      setDailyGoalInput(goal.toString());
+    }
     const storedCalories = localStorage.getItem('consumedCalories');
     if (storedCalories) setConsumedCalories(JSON.parse(storedCalories));
     const storedLog = localStorage.getItem('calorieLog');
@@ -511,11 +516,23 @@ export default function HomePage() {
   };
 
   const handleDailyGoalChange = (e: ChangeEvent<HTMLInputElement>) => {
-    const newGoal = parseInt(e.target.value, 10);
+    const inputValue = e.target.value;
+    setDailyGoalInput(inputValue);
+    
+    if (inputValue === '') {
+      // Allow empty input temporarily, but keep current goal
+      return;
+    }
+    
+    const newGoal = parseInt(inputValue, 10);
     if (!isNaN(newGoal) && newGoal > 0) {
       setDailyGoal(newGoal);
-    } else if (e.target.value === '') {
-      setDailyGoal(DEFAULT_DAILY_GOAL);
+    }
+  };
+
+  const handleDailyGoalBlur = () => {
+    if (dailyGoalInput === '' || parseInt(dailyGoalInput, 10) <= 0 || isNaN(parseInt(dailyGoalInput, 10))) {
+      setDailyGoalInput(dailyGoal.toString());
     }
   };
 
@@ -562,10 +579,12 @@ export default function HomePage() {
             <p className="text-slate-600 mr-2">Daily Goal:</p>
             <input 
                 type="number"
-                value={dailyGoal.toString()}
+                value={dailyGoalInput}
                 onChange={handleDailyGoalChange}
+                onBlur={handleDailyGoalBlur}
                 className="w-24 p-2 border border-slate-300 rounded-lg text-center text-slate-700 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 shadow-sm text-sm"
                 placeholder="kcal"
+                min="1"
             />
              <p className="text-slate-600 ml-1.5">kcal</p>
         </div>
