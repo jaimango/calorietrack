@@ -29,10 +29,24 @@ ChartJS.register(
 const DEFAULT_DAILY_GOAL = 2000;
 const OPENAI_API_KEY = process.env.NEXT_PUBLIC_OPENAI_KEY;
 
+// Ideal macro percentages (commonly recommended ranges)
+const IDEAL_MACRO_PERCENTAGES = {
+  carbs: 45, // 45% of calories from carbs
+  protein: 25, // 25% of calories from protein  
+  fat: 30, // 30% of calories from fat
+};
+
+interface MacroData {
+  carbs: number;
+  protein: number;
+  fat: number;
+}
+
 interface LogEntry {
   id: string;
   text: string;
   calories: number;
+  macros: MacroData;
   timestamp: number;
 }
 
@@ -194,6 +208,7 @@ export default function HomePage() {
   const [dailyGoal, setDailyGoal] = useState<number>(DEFAULT_DAILY_GOAL);
   const [dailyGoalInput, setDailyGoalInput] = useState<string>(DEFAULT_DAILY_GOAL.toString());
   const [consumedCalories, setConsumedCalories] = useState<number>(0);
+  const [consumedMacros, setConsumedMacros] = useState<MacroData>({ carbs: 0, protein: 0, fat: 0 });
   const [mealInput, setMealInput] = useState<string>('');
   const [log, setLog] = useState<LogEntry[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -214,10 +229,31 @@ export default function HomePage() {
     }
     const storedCalories = localStorage.getItem('consumedCalories');
     if (storedCalories) setConsumedCalories(JSON.parse(storedCalories));
+    const storedMacros = localStorage.getItem('consumedMacros');
+    if (storedMacros) setConsumedMacros(JSON.parse(storedMacros));
     const storedLog = localStorage.getItem('calorieLog');
-    if (storedLog) setLog(JSON.parse(storedLog));
+    if (storedLog) {
+      const parsedLog = JSON.parse(storedLog);
+      // Migrate old entries that might not have macro data
+      const migratedLog = parsedLog.map((entry: any) => ({
+        ...entry,
+        macros: entry.macros || { carbs: 0, protein: 0, fat: 0 }
+      }));
+      setLog(migratedLog);
+    }
     const storedHistory = localStorage.getItem('calorieHistory');
-    if (storedHistory) setCalorieHistory(JSON.parse(storedHistory));
+    if (storedHistory) {
+      const parsedHistory = JSON.parse(storedHistory);
+      // Migrate old history entries that might not have macro data
+      const migratedHistory = parsedHistory.map((day: any) => ({
+        ...day,
+        mealLog: day.mealLog.map((entry: any) => ({
+          ...entry,
+          macros: entry.macros || { carbs: 0, protein: 0, fat: 0 }
+        }))
+      }));
+      setCalorieHistory(migratedHistory);
+    }
 
     // --- Updated: Date check using Luxon ---
     const getFormattedDate = (date: DateTime): string => date.toFormat('yyyy-MM-dd');
@@ -251,15 +287,18 @@ export default function HomePage() {
       localStorage.setItem('calorieHistory', JSON.stringify(updatedHistory));
       // Reset log and calories for today
       setConsumedCalories(0);
+      setConsumedMacros({ carbs: 0, protein: 0, fat: 0 });
       setLog([
         {
           id: DateTime.now().toMillis().toString(),
           text: 'Daily Reset for new day',
           calories: 0,
+          macros: { carbs: 0, protein: 0, fat: 0 },
           timestamp: DateTime.now().toMillis(),
         },
       ]);
       localStorage.setItem('consumedCalories', '0');
+      localStorage.setItem('consumedMacros', JSON.stringify({ carbs: 0, protein: 0, fat: 0 }));
       localStorage.setItem('calorieLog', JSON.stringify([
         {
           id: DateTime.now().toMillis().toString(),
@@ -279,6 +318,10 @@ export default function HomePage() {
   useEffect(() => {
     localStorage.setItem('consumedCalories', JSON.stringify(consumedCalories));
   }, [consumedCalories]);
+
+  useEffect(() => {
+    localStorage.setItem('consumedMacros', JSON.stringify(consumedMacros));
+  }, [consumedMacros]);
 
   useEffect(() => {
     localStorage.setItem('calorieLog', JSON.stringify(log));
@@ -322,11 +365,13 @@ export default function HomePage() {
         
         // Reset for the new day
         setConsumedCalories(0);
+        setConsumedMacros({ carbs: 0, protein: 0, fat: 0 });
         setLog([
           {
             id: DateTime.now().toMillis().toString(),
             text: 'Daily Reset for new day',
             calories: 0,
+            macros: { carbs: 0, protein: 0, fat: 0 },
             timestamp: DateTime.now().toMillis(),
           },
         ]);
@@ -341,30 +386,46 @@ export default function HomePage() {
     return clearTimer;
   }, [consumedCalories, log, dailyGoal]);
 
-  const parseCaloriesFromResponse = (responseText: string): number | null => {
+  const parseNutritionFromResponse = (responseText: string): { calories: number; macros: MacroData } | null => {
     console.log('OpenAI Response for parsing:', responseText);
-    const specificPattern = /(\d+)\s*(?:calories|kcal)/i;
-    const specificMatch = responseText.match(specificPattern);
-    if (specificMatch && specificMatch[1]) {
-      return parseInt(specificMatch[1], 10);
-    }
-    const generalNumberPattern = /\b(\d+)\b/;
-    const generalMatch = responseText.match(generalNumberPattern);
-    if (generalMatch && generalMatch[1]) {
-      const potentialCalories = parseInt(generalMatch[1], 10);
-      if (potentialCalories > 0 && potentialCalories < 5000) {
-        return potentialCalories;
+    try {
+      // Try to parse as JSON first
+      const jsonData = JSON.parse(responseText.trim());
+      if (jsonData.calories !== undefined && jsonData.carbs !== undefined && 
+          jsonData.protein !== undefined && jsonData.fat !== undefined) {
+        return {
+          calories: parseInt(jsonData.calories) || 0,
+          macros: {
+            carbs: parseInt(jsonData.carbs) || 0,
+            protein: parseInt(jsonData.protein) || 0,
+            fat: parseInt(jsonData.fat) || 0
+          }
+        };
+      }
+    } catch (e) {
+      // Fallback for old format - just calories
+      const specificPattern = /(\d+)\s*(?:calories|kcal)/i;
+      const specificMatch = responseText.match(specificPattern);
+      if (specificMatch && specificMatch[1]) {
+        const calories = parseInt(specificMatch[1], 10);
+        return {
+          calories,
+          macros: { carbs: 0, protein: 0, fat: 0 } // Default to 0 if no macro data
+        };
+      }
+      const generalNumberPattern = /\b(\d+)\b/;
+      const generalMatch = responseText.match(generalNumberPattern);
+      if (generalMatch && generalMatch[1]) {
+        const potentialCalories = parseInt(generalMatch[1], 10);
+        if (potentialCalories > 0 && potentialCalories < 5000) {
+          return {
+            calories: potentialCalories,
+            macros: { carbs: 0, protein: 0, fat: 0 }
+          };
+        }
       }
     }
-    const anyDigitsPattern = /(\d+)/;
-    const anyDigitsMatch = responseText.match(anyDigitsPattern);
-    if (anyDigitsMatch && anyDigitsMatch[1]) {
-        const potentialCalories = parseInt(anyDigitsMatch[1], 10);
-        if (potentialCalories > 0 && potentialCalories < 5000) {
-            return potentialCalories;
-        }
-    }
-    console.warn('Could not parse a calorie number from response:', responseText);
+    console.warn('Could not parse nutrition data from response:', responseText);
     return null;
   };
 
@@ -397,10 +458,12 @@ export default function HomePage() {
         id: DateTime.now().toMillis().toString(),
         text: entryText || (imageBase64 ? 'Meal from image' : 'Logged Meal'),
         calories: caloriesNum,
+        macros: { carbs: 0, protein: 0, fat: 0 }, // Manual entries default to 0 macros
         timestamp: DateTime.now().toMillis(),
       };
       setLog(prevLog => [newEntry, ...prevLog]);
       setConsumedCalories(prev => prev + caloriesNum);
+      // Manual entries don't have macro data, so no macro update needed
       setIsLoading(false);
       setMealInput('');
       setManualCalories('');
@@ -411,7 +474,7 @@ export default function HomePage() {
     }
 
     let promptContent: OpenAIPromptContent[] = [];
-    const systemMessage = "You are a calorie estimation assistant. Your task is to estimate the calories in the provided meal description or image. Respond with ONLY the numerical value of the estimated calories. For example, if you estimate 350 calories, respond with '350'. Do not include units like 'calories' or 'kcal' or any other descriptive text. If you cannot estimate, respond with '0'.";
+    const systemMessage = "You are a nutrition estimation assistant. Your task is to estimate the calories and macros (carbohydrates, protein, fat) in the provided meal description or image. Respond with ONLY a JSON object in this exact format: {\"calories\": 350, \"carbs\": 45, \"protein\": 25, \"fat\": 8}. The numbers should represent grams for macros and total calories. If you cannot estimate, respond with {\"calories\": 0, \"carbs\": 0, \"protein\": 0, \"fat\": 0}.";
     if (text) {
       promptContent.push({ type: 'text', text: `Meal: ${text}` });
     }
@@ -440,7 +503,7 @@ export default function HomePage() {
               content: promptContent,
             },
           ],
-          max_tokens: 15, 
+          max_tokens: 50, 
           temperature: 0.2,
         }),
       });
@@ -452,8 +515,8 @@ export default function HomePage() {
       const data = await response.json();
       const choice = data.choices?.[0]?.message?.content;
       if (choice) {
-        const estimatedCalories = parseCaloriesFromResponse(choice);
-        if (estimatedCalories !== null) {
+        const nutritionData = parseNutritionFromResponse(choice);
+        if (nutritionData !== null) {
           let entryText = text.trim();
           if (imageBase64 && !entryText) {
             setIsLoading(true); 
@@ -467,11 +530,17 @@ export default function HomePage() {
           const newEntry: LogEntry = {
             id: DateTime.now().toMillis().toString(),
             text: entryText || (imageBase64 ? 'Meal from image' : 'Logged Meal'),
-            calories: estimatedCalories,
+            calories: nutritionData.calories,
+            macros: nutritionData.macros,
             timestamp: DateTime.now().toMillis(),
           };
           setLog(prevLog => [newEntry, ...prevLog]);
-          setConsumedCalories(prev => prev + estimatedCalories);
+          setConsumedCalories(prev => prev + nutritionData.calories);
+          setConsumedMacros(prev => ({
+            carbs: prev.carbs + nutritionData.macros.carbs,
+            protein: prev.protein + nutritionData.macros.protein,
+            fat: prev.fat + nutritionData.macros.fat,
+          }));
         } else {
           setError('Could not parse calorie estimate from response: ' + choice);
         }
@@ -540,6 +609,11 @@ export default function HomePage() {
     const entryToDelete = log.find(entry => entry.id === entryId);
     if (entryToDelete) {
       setConsumedCalories(prevCalories => prevCalories - entryToDelete.calories);
+      setConsumedMacros(prev => ({
+        carbs: prev.carbs - entryToDelete.macros.carbs,
+        protein: prev.protein - entryToDelete.macros.protein,
+        fat: prev.fat - entryToDelete.macros.fat,
+      }));
       setLog(prevLog => prevLog.filter(entry => entry.id !== entryId));
     }
   };
@@ -551,10 +625,16 @@ export default function HomePage() {
         id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
         text: entryToDuplicate.text,
         calories: entryToDuplicate.calories,
+        macros: entryToDuplicate.macros,
         timestamp: Date.now(),
       };
       setLog(prevLog => [...prevLog, newEntry]);
       setConsumedCalories(prevCalories => prevCalories + newEntry.calories);
+      setConsumedMacros(prev => ({
+        carbs: prev.carbs + newEntry.macros.carbs,
+        protein: prev.protein + newEntry.macros.protein,
+        fat: prev.fat + newEntry.macros.fat,
+      }));
     }
   };
 
@@ -563,13 +643,64 @@ export default function HomePage() {
       id: Date.now().toString() + Math.random().toString(36).substr(2, 9),
       text: entry.text,
       calories: entry.calories,
+      macros: entry.macros,
       timestamp: Date.now(),
     };
     setLog(prevLog => [...prevLog, newEntry]);
     setConsumedCalories(prevCalories => prevCalories + newEntry.calories);
+    setConsumedMacros(prev => ({
+      carbs: prev.carbs + newEntry.macros.carbs,
+      protein: prev.protein + newEntry.macros.protein,
+      fat: prev.fat + newEntry.macros.fat,
+    }));
   };
 
   const progressPercentage = Math.min((consumedCalories / dailyGoal) * 100, 100);
+
+  // Calculate macro percentages based on consumed calories
+  const getMacroPercentages = () => {
+    if (consumedCalories === 0) return { carbs: 0, protein: 0, fat: 0 };
+    
+    // Convert grams to calories (carbs: 4 cal/g, protein: 4 cal/g, fat: 9 cal/g)
+    const carbCalories = consumedMacros.carbs * 4;
+    const proteinCalories = consumedMacros.protein * 4;
+    const fatCalories = consumedMacros.fat * 9;
+    
+    return {
+      carbs: Math.round((carbCalories / consumedCalories) * 100),
+      protein: Math.round((proteinCalories / consumedCalories) * 100),
+      fat: Math.round((fatCalories / consumedCalories) * 100),
+    };
+  };
+
+  const macroPercentages = getMacroPercentages();
+
+  // Calculate total macros for a day's meals
+  const getDayMacros = (mealLog: LogEntry[]): MacroData => {
+    return mealLog.filter(entry => entry.text !== 'Daily Reset for new day').reduce(
+      (totals, entry) => ({
+        carbs: totals.carbs + entry.macros.carbs,
+        protein: totals.protein + entry.macros.protein,
+        fat: totals.fat + entry.macros.fat,
+      }),
+      { carbs: 0, protein: 0, fat: 0 }
+    );
+  };
+
+  // Calculate macro percentages for a specific day
+  const getDayMacroPercentages = (totalCalories: number, macros: MacroData) => {
+    if (totalCalories === 0) return { carbs: 0, protein: 0, fat: 0 };
+    
+    const carbCalories = macros.carbs * 4;
+    const proteinCalories = macros.protein * 4;
+    const fatCalories = macros.fat * 9;
+    
+    return {
+      carbs: Math.round((carbCalories / totalCalories) * 100),
+      protein: Math.round((proteinCalories / totalCalories) * 100),
+      fat: Math.round((fatCalories / totalCalories) * 100),
+    };
+  };
 
   return (
     <div className="min-h-screen flex flex-col items-center p-4 pt-10 max-w-md mx-auto">
@@ -601,6 +732,54 @@ export default function HomePage() {
             style={{ width: `${progressPercentage}%` }}
           >
             {progressPercentage > 5 ? `${progressPercentage.toFixed(0)}%` : ''}
+          </div>
+        </div>
+      </div>
+
+      {/* Macro Progress Display */}
+      <div className="w-full mb-8">
+        <h3 className="text-lg font-semibold text-slate-700 mb-3">Macros</h3>
+        <div className="space-y-3">
+          {/* Carbohydrates */}
+          <div>
+            <div className="flex justify-between text-sm text-slate-600 mb-1">
+              <span>Carbs ({consumedMacros.carbs}g)</span>
+              <span>{macroPercentages.carbs}% (ideal: {IDEAL_MACRO_PERCENTAGES.carbs}%)</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner overflow-hidden">
+              <div
+                className="bg-green-500 h-full rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${Math.min(macroPercentages.carbs, 100)}%` }}
+              />
+            </div>
+          </div>
+          
+          {/* Protein */}
+          <div>
+            <div className="flex justify-between text-sm text-slate-600 mb-1">
+              <span>Protein ({consumedMacros.protein}g)</span>
+              <span>{macroPercentages.protein}% (ideal: {IDEAL_MACRO_PERCENTAGES.protein}%)</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner overflow-hidden">
+              <div
+                className="bg-red-500 h-full rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${Math.min(macroPercentages.protein, 100)}%` }}
+              />
+            </div>
+          </div>
+          
+          {/* Fat */}
+          <div>
+            <div className="flex justify-between text-sm text-slate-600 mb-1">
+              <span>Fat ({consumedMacros.fat}g)</span>
+              <span>{macroPercentages.fat}% (ideal: {IDEAL_MACRO_PERCENTAGES.fat}%)</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner overflow-hidden">
+              <div
+                className="bg-yellow-500 h-full rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${Math.min(macroPercentages.fat, 100)}%` }}
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -678,32 +857,44 @@ export default function HomePage() {
         ) : (
           <ul className="space-y-3.5">
             {log.filter(entry => entry.text !== 'Daily Reset for new day').map((entry) => (
-              <li key={entry.id} className="p-4 bg-white rounded-xl shadow-lg flex justify-between items-center transition-shadow hover:shadow-xl">
-                <div className="flex-grow mr-3">
-                  <p className="font-medium text-slate-800 text-lg">{entry.text}</p>
-                  <p className="text-xs text-slate-500">{new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+              <li key={entry.id} className="p-4 bg-white rounded-xl shadow-lg transition-shadow hover:shadow-xl">
+                <div className="flex justify-between items-start mb-2">
+                  <div className="flex-grow mr-3">
+                    <p className="font-medium text-slate-800 text-lg">{entry.text}</p>
+                    <p className="text-xs text-slate-500">{new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  </div>
+                  <div className="flex items-center space-x-3">
+                    <span className="font-semibold text-lg text-cyan-600">{entry.calories} kcal</span>
+                    <div className="flex items-center space-x-1">
+                      <button 
+                        onClick={() => handleDuplicateLogEntry(entry.id)}
+                        className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded-full transition-colors duration-150"
+                        aria-label="Duplicate meal entry"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteLogEntry(entry.id)}
+                        className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors duration-150"
+                        aria-label="Delete meal entry"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                 </div>
-                <span className="font-semibold text-lg text-cyan-600 mr-3">{entry.calories} kcal</span>
-                <div className="flex items-center space-x-1">
-                  <button 
-                    onClick={() => handleDuplicateLogEntry(entry.id)}
-                    className="p-1.5 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded-full transition-colors duration-150"
-                    aria-label="Duplicate meal entry"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                    </svg>
-                  </button>
-                  <button 
-                    onClick={() => handleDeleteLogEntry(entry.id)}
-                    className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-100 rounded-full transition-colors duration-150"
-                    aria-label="Delete meal entry"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-5 h-5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
+                {/* Macro information */}
+                {(entry.macros.carbs > 0 || entry.macros.protein > 0 || entry.macros.fat > 0) && (
+                  <div className="flex justify-between text-xs text-slate-500 mt-2 pt-2 border-t border-slate-100">
+                    <span>C: {entry.macros.carbs}g</span>
+                    <span>P: {entry.macros.protein}g</span>
+                    <span>F: {entry.macros.fat}g</span>
+                  </div>
+                                 )}
               </li>
             ))}
           </ul>
@@ -731,7 +922,11 @@ export default function HomePage() {
             ) : (
               <>
                 <CalorieHistoryGraph history={calorieHistory} />
-                {calorieHistory.map((day) => (
+                {calorieHistory.map((day) => {
+                  const dayMacros = getDayMacros(day.mealLog);
+                  const dayMacroPercentages = getDayMacroPercentages(day.totalCalories, dayMacros);
+                  
+                  return (
                   <div key={day.date} className="p-5 bg-white rounded-xl shadow-lg">
                     <div 
                       className="flex justify-between items-center cursor-pointer" 
@@ -740,6 +935,12 @@ export default function HomePage() {
                       <div>
                         <h3 className="text-xl font-semibold text-cyan-700">{new Date(day.date + 'T00:00:00').toLocaleDateString([], { year: 'numeric', month: 'long', day: 'numeric' })}</h3>
                         <p className="text-sm text-slate-600">Total: {day.totalCalories} kcal (Goal: {day.dailyGoalAtTheTime} kcal)</p>
+                        {(dayMacros.carbs > 0 || dayMacros.protein > 0 || dayMacros.fat > 0) && (
+                          <p className="text-xs text-slate-500 mt-1">
+                            Macros: C: {dayMacroPercentages.carbs}% ({dayMacros.carbs}g) • P: {dayMacroPercentages.protein}% ({dayMacros.protein}g) • F: {dayMacroPercentages.fat}% ({dayMacros.fat}g)
+                          </p>
+                        )}
+                        <p className="text-xs text-slate-400 mt-1">Ideal: C: {IDEAL_MACRO_PERCENTAGES.carbs}% • P: {IDEAL_MACRO_PERCENTAGES.protein}% • F: {IDEAL_MACRO_PERCENTAGES.fat}%</p>
                       </div>
                       <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={`w-5 h-5 transition-transform duration-300 ${expandedHistoryDate === day.date ? 'rotate-180' : ''}`}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
@@ -748,24 +949,34 @@ export default function HomePage() {
                     {expandedHistoryDate === day.date && (
                       <ul className="mt-4 space-y-2.5 pl-2 border-l-2 border-slate-200 ml-1">
                         {day.mealLog.filter(entry => entry.text !== 'Daily Reset for new day').map((entry) => (
-                          <li key={entry.id} className="p-2.5 bg-slate-50 rounded-lg shadow-sm flex justify-between items-center text-sm">
-                            <div className="flex-grow">
-                              <p className="font-medium text-slate-700">{entry.text}</p>
-                              <p className="text-xs text-slate-500">{new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                          <li key={entry.id} className="p-2.5 bg-slate-50 rounded-lg shadow-sm text-sm">
+                            <div className="flex justify-between items-center">
+                              <div className="flex-grow">
+                                <p className="font-medium text-slate-700">{entry.text}</p>
+                                <p className="text-xs text-slate-500">{new Date(entry.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span className="font-medium text-cyan-600">{entry.calories} kcal</span>
+                                <button 
+                                  onClick={() => handleDuplicateFromHistory(entry)}
+                                  className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded-full transition-colors duration-150"
+                                  aria-label="Duplicate meal entry to today"
+                                  title="Add to today's log"
+                                >
+                                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                                  </svg>
+                                </button>
+                              </div>
                             </div>
-                            <div className="flex items-center space-x-2">
-                              <span className="font-medium text-cyan-600">{entry.calories} kcal</span>
-                              <button 
-                                onClick={() => handleDuplicateFromHistory(entry)}
-                                className="p-1 text-blue-500 hover:text-blue-700 hover:bg-blue-100 rounded-full transition-colors duration-150"
-                                aria-label="Duplicate meal entry to today"
-                                title="Add to today's log"
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
-                                </svg>
-                              </button>
-                            </div>
+                            {/* Macro information for history entries */}
+                            {(entry.macros.carbs > 0 || entry.macros.protein > 0 || entry.macros.fat > 0) && (
+                              <div className="flex justify-between text-xs text-slate-400 mt-1 pt-1 border-t border-slate-200">
+                                <span>C: {entry.macros.carbs}g</span>
+                                <span>P: {entry.macros.protein}g</span>
+                                <span>F: {entry.macros.fat}g</span>
+                              </div>
+                            )}
                           </li>
                         ))}
                         {day.mealLog.filter(entry => entry.text !== 'Daily Reset for new day').length === 0 && (
@@ -774,7 +985,8 @@ export default function HomePage() {
                       </ul>
                     )}
                   </div>
-                ))}
+                  );
+                })}
               </>
             )}
           </div>
