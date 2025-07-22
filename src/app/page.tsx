@@ -767,54 +767,6 @@ export default function HomePage() {
         </div>
       </div>
 
-      {/* Macro Progress Display */}
-      <div className="w-full mb-8">
-        <h3 className="text-lg font-semibold text-slate-700 mb-3">Macros</h3>
-        <div className="space-y-3">
-          {/* Carbohydrates */}
-          <div>
-            <div className="flex justify-between text-sm text-slate-600 mb-1">
-              <span>Carbs ({consumedMacros.carbs}g)</span>
-              <span>{macroPercentages.carbs}% (ideal: {getIdealMacroPercentages().carbs}%)</span>
-            </div>
-            <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner overflow-hidden">
-              <div
-                className="bg-green-500 h-full rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${Math.min(macroPercentages.carbs, 100)}%` }}
-              />
-            </div>
-          </div>
-          
-          {/* Protein */}
-          <div>
-            <div className="flex justify-between text-sm text-slate-600 mb-1">
-              <span>Protein ({consumedMacros.protein}g)</span>
-              <span>{macroPercentages.protein}% (ideal: {getIdealMacroPercentages().protein}%)</span>
-            </div>
-            <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner overflow-hidden">
-              <div
-                className="bg-red-500 h-full rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${Math.min(macroPercentages.protein, 100)}%` }}
-              />
-            </div>
-          </div>
-          
-          {/* Fat */}
-          <div>
-            <div className="flex justify-between text-sm text-slate-600 mb-1">
-              <span>Fat ({consumedMacros.fat}g)</span>
-              <span>{macroPercentages.fat}% (ideal: {getIdealMacroPercentages().fat}%)</span>
-            </div>
-            <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner overflow-hidden">
-              <div
-                className="bg-yellow-500 h-full rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${Math.min(macroPercentages.fat, 100)}%` }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
       <form onSubmit={handleTextSubmit} className="w-full mb-8 space-y-4">
         <textarea
           rows={3}
@@ -881,6 +833,59 @@ export default function HomePage() {
         </div>
       )}
 
+      {/* Macro Progress Display */}
+      <div className="w-full mb-8">
+        <div className="flex justify-between items-center mb-3">
+          <h3 className="text-lg font-semibold text-slate-700">Macros</h3>
+          <span className="text-sm font-medium text-cyan-600 bg-cyan-50 px-2 py-1 rounded-md">
+            {selectedProfile}
+          </span>
+        </div>
+        <div className="space-y-3">
+          {/* Carbohydrates */}
+          <div>
+            <div className="flex justify-between text-sm text-slate-600 mb-1">
+              <span>Carbs ({consumedMacros.carbs}g)</span>
+              <span>{macroPercentages.carbs}% (ideal: {getIdealMacroPercentages().carbs}%)</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner overflow-hidden">
+              <div
+                className="bg-green-500 h-full rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${Math.min(macroPercentages.carbs, 100)}%` }}
+              />
+            </div>
+          </div>
+          
+          {/* Protein */}
+          <div>
+            <div className="flex justify-between text-sm text-slate-600 mb-1">
+              <span>Protein ({consumedMacros.protein}g)</span>
+              <span>{macroPercentages.protein}% (ideal: {getIdealMacroPercentages().protein}%)</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner overflow-hidden">
+              <div
+                className="bg-red-500 h-full rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${Math.min(macroPercentages.protein, 100)}%` }}
+              />
+            </div>
+          </div>
+          
+          {/* Fat */}
+          <div>
+            <div className="flex justify-between text-sm text-slate-600 mb-1">
+              <span>Fat ({consumedMacros.fat}g)</span>
+              <span>{macroPercentages.fat}% (ideal: {getIdealMacroPercentages().fat}%)</span>
+            </div>
+            <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner overflow-hidden">
+              <div
+                className="bg-yellow-500 h-full rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${Math.min(macroPercentages.fat, 100)}%` }}
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="w-full mb-10">
         <h2 className="text-3xl font-semibold text-slate-700 mb-5">Today&apos;s Log</h2>
         {log.length === 0 || log.every(entry => entry.text === 'Daily Reset for new day') && !isLoading ? (
@@ -918,14 +923,14 @@ export default function HomePage() {
                     </div>
                   </div>
                 </div>
-                {/* Macro information */}
+                                {/* Macro information */}
                 {(entry.macros.carbs > 0 || entry.macros.protein > 0 || entry.macros.fat > 0) && (
                   <div className="flex justify-between text-xs text-slate-500 mt-2 pt-2 border-t border-slate-100">
-                    <span>C: {entry.macros.carbs}g</span>
-                    <span>P: {entry.macros.protein}g</span>
-                    <span>F: {entry.macros.fat}g</span>
+                    <span>C: {entry.macros.carbs}g ({Math.round((entry.macros.carbs * 4 / entry.calories) * 100)}%)</span>
+                    <span>P: {entry.macros.protein}g ({Math.round((entry.macros.protein * 4 / entry.calories) * 100)}%)</span>
+                    <span>F: {entry.macros.fat}g ({Math.round((entry.macros.fat * 9 / entry.calories) * 100)}%)</span>
                   </div>
-                                 )}
+                )}
               </li>
             ))}
           </ul>
@@ -1003,9 +1008,9 @@ export default function HomePage() {
                             {/* Macro information for history entries */}
                             {(entry.macros.carbs > 0 || entry.macros.protein > 0 || entry.macros.fat > 0) && (
                               <div className="flex justify-between text-xs text-slate-400 mt-1 pt-1 border-t border-slate-200">
-                                <span>C: {entry.macros.carbs}g</span>
-                                <span>P: {entry.macros.protein}g</span>
-                                <span>F: {entry.macros.fat}g</span>
+                                <span>C: {entry.macros.carbs}g ({Math.round((entry.macros.carbs * 4 / entry.calories) * 100)}%)</span>
+                                <span>P: {entry.macros.protein}g ({Math.round((entry.macros.protein * 4 / entry.calories) * 100)}%)</span>
+                                <span>F: {entry.macros.fat}g ({Math.round((entry.macros.fat * 9 / entry.calories) * 100)}%)</span>
                               </div>
                             )}
                           </li>
