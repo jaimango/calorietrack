@@ -734,25 +734,27 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center p-4 pt-10 max-w-md mx-auto">
-      <header className="w-full mb-10 text-center">
-        <h1 className="text-5xl font-bold text-cyan-700">Intake</h1>
-        <div className="mt-4 flex items-center justify-center">
-            <p className="text-slate-600 mr-2">Daily Goal:</p>
+    <div className="min-h-screen flex flex-col items-center p-4 pt-6 max-w-md mx-auto">
+      <header className="w-full mb-6">
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold text-cyan-700">Intake</h1>
+          <div className="flex items-center">
+            <p className="text-slate-600 text-sm mr-2">Goal:</p>
             <input 
                 type="number"
                 value={dailyGoalInput}
                 onChange={handleDailyGoalChange}
                 onBlur={handleDailyGoalBlur}
-                className="w-24 p-2 border border-slate-300 rounded-lg text-center text-slate-700 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 shadow-sm text-sm"
+                className="w-20 p-1.5 border border-slate-300 rounded text-center text-slate-700 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 shadow-sm text-sm"
                 placeholder="kcal"
                 min="1"
             />
-             <p className="text-slate-600 ml-1.5">kcal</p>
+            <p className="text-slate-600 text-sm ml-1">kcal</p>
+          </div>
         </div>
       </header>
 
-      <div className="w-full mb-10">
+      <div className="w-full mb-6">
         <div className="flex justify-between text-sm text-slate-600 mb-1.5">
           <span>{consumedCalories} kcal consumed</span>
           <span>{Math.max(0, dailyGoal - consumedCalories)} kcal remaining</span>
@@ -767,23 +769,23 @@ export default function HomePage() {
         </div>
       </div>
 
-      <form onSubmit={handleTextSubmit} className="w-full mb-8 space-y-4">
+      <form onSubmit={handleTextSubmit} className="w-full mb-5 space-y-3">
         <textarea
-          rows={3}
-          className="w-full p-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 resize-none placeholder-slate-400 text-slate-700"
+          rows={2}
+          className="w-full p-2.5 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 resize-none placeholder-slate-400 text-slate-700 text-sm"
           placeholder="e.g., 'Chicken salad with avocado' or upload a photo..."
           value={mealInput}
           onChange={(e) => setMealInput(e.target.value)}
           disabled={isLoading}
         />
-        <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
+        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
             <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()} 
-                className="w-full sm:w-auto flex-grow justify-center items-center px-6 py-3 bg-sky-500 text-white font-semibold rounded-lg shadow-md hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-opacity-75 transition duration-150 disabled:opacity-60 disabled:cursor-not-allowed flex"
+                className="w-full sm:w-auto flex-grow justify-center items-center px-4 py-2.5 bg-sky-500 text-white font-medium rounded-lg shadow-md hover:bg-sky-600 focus:outline-none focus:ring-2 focus:ring-sky-400 focus:ring-opacity-75 transition duration-150 disabled:opacity-60 disabled:cursor-not-allowed flex text-sm"
                 disabled={isLoading}
             >
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-5 h-5 mr-2">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4 mr-1.5">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5m-13.5-9L12 3m0 0 4.5 4.5M12 3v13.5" />
                 </svg>
                 Take Photo
@@ -799,7 +801,7 @@ export default function HomePage() {
             />
             <button
                 type="submit"
-                className="w-full sm:w-auto flex-grow justify-center items-center px-6 py-3 bg-cyan-600 text-white font-semibold rounded-lg shadow-md hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-75 transition duration-150 disabled:opacity-60 disabled:cursor-not-allowed flex"
+                className="w-full sm:w-auto flex-grow justify-center items-center px-4 py-2.5 bg-cyan-600 text-white font-medium rounded-lg shadow-md hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-cyan-500 focus:ring-opacity-75 transition duration-150 disabled:opacity-60 disabled:cursor-not-allowed flex text-sm"
                 disabled={isLoading || (!mealInput.trim() && !fileInputRef.current?.files?.length)}
             >
                  {isLoading ? (
@@ -818,12 +820,12 @@ export default function HomePage() {
       </form>
 
       {/* Manual Calories Input */}
-      <div className="w-full mb-6">
+      <div className="w-full mb-4">
         <input
           type="number"
           min="0"
           step="1"
-          className="w-full p-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-700 placeholder-slate-400"
+          className="w-full p-2.5 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-700 placeholder-slate-400 text-sm"
           placeholder="Calories (optional, e.g. 350)"
           value={manualCalories}
           onChange={e => setManualCalories(e.target.value)}
@@ -832,13 +834,13 @@ export default function HomePage() {
       </div>
 
       {error && (
-        <div className="w-full p-3 mb-6 text-sm text-red-700 bg-red-100 rounded-lg border border-red-300 shadow" role="alert">
+        <div className="w-full p-3 mb-4 text-sm text-red-700 bg-red-100 rounded-lg border border-red-300 shadow" role="alert">
           <span className="font-semibold">Error:</span> {error}
         </div>
       )}
 
       {/* Macro Progress Display */}
-      <div className="w-full mb-8">
+      <div className="w-full mb-6">
         <div className="flex justify-between items-center mb-3">
           <h3 className="text-lg font-semibold text-slate-700">Macros</h3>
           <span className="text-sm font-medium text-cyan-600 bg-cyan-50 px-2 py-1 rounded-md">
