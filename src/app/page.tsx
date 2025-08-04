@@ -776,16 +776,6 @@ export default function HomePage() {
           onChange={(e) => setMealInput(e.target.value)}
           disabled={isLoading}
         />
-        <input
-          type="number"
-          min="0"
-          step="1"
-          className="w-full p-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-700 placeholder-slate-400"
-          placeholder="Calories (optional, e.g. 350)"
-          value={manualCalories}
-          onChange={e => setManualCalories(e.target.value)}
-          disabled={isLoading}
-        />
         <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-3">
             <button
                 type="button"
@@ -826,6 +816,20 @@ export default function HomePage() {
             </button>
         </div>
       </form>
+
+      {/* Manual Calories Input */}
+      <div className="w-full mb-6">
+        <input
+          type="number"
+          min="0"
+          step="1"
+          className="w-full p-3 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-700 placeholder-slate-400"
+          placeholder="Calories (optional, e.g. 350)"
+          value={manualCalories}
+          onChange={e => setManualCalories(e.target.value)}
+          disabled={isLoading}
+        />
+      </div>
 
       {error && (
         <div className="w-full p-3 mb-6 text-sm text-red-700 bg-red-100 rounded-lg border border-red-300 shadow" role="alert">
