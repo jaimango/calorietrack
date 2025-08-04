@@ -745,7 +745,7 @@ export default function HomePage() {
                 value={dailyGoalInput}
                 onChange={handleDailyGoalChange}
                 onBlur={handleDailyGoalBlur}
-                className="w-20 p-1.5 border border-slate-300 rounded text-center text-slate-700 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 shadow-sm text-sm"
+                className="w-20 p-1.5 border border-slate-300 rounded text-center text-slate-700 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 shadow-sm text-base"
                 placeholder="kcal"
                 min="1"
             />
@@ -772,7 +772,7 @@ export default function HomePage() {
       <form onSubmit={handleTextSubmit} className="w-full mb-5 space-y-3">
         <textarea
           rows={2}
-          className="w-full p-2.5 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 resize-none placeholder-slate-400 text-slate-700 text-sm"
+          className="w-full p-2.5 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 resize-none placeholder-slate-400 text-slate-700 text-base"
           placeholder="e.g., 'Chicken salad with avocado' or upload a photo..."
           value={mealInput}
           onChange={(e) => setMealInput(e.target.value)}
@@ -825,7 +825,7 @@ export default function HomePage() {
           type="number"
           min="0"
           step="1"
-          className="w-full p-2.5 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-700 placeholder-slate-400 text-sm"
+          className="w-full p-2.5 border border-slate-300 rounded-lg shadow-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-slate-700 placeholder-slate-400 text-base"
           placeholder="Calories (optional, e.g. 350)"
           value={manualCalories}
           onChange={e => setManualCalories(e.target.value)}
