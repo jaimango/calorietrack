@@ -855,7 +855,7 @@ export default function HomePage() {
             <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner overflow-hidden">
               <div
                 className="bg-green-500 h-full rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${Math.min(macroPercentages.carbs, 100)}%` }}
+                style={{ width: `${Math.min((macroPercentages.carbs / getIdealMacroPercentages().carbs) * 100, 100)}%` }}
               />
             </div>
           </div>
@@ -869,7 +869,7 @@ export default function HomePage() {
             <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner overflow-hidden">
               <div
                 className="bg-red-500 h-full rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${Math.min(macroPercentages.protein, 100)}%` }}
+                style={{ width: `${Math.min((macroPercentages.protein / getIdealMacroPercentages().protein) * 100, 100)}%` }}
               />
             </div>
           </div>
@@ -883,7 +883,7 @@ export default function HomePage() {
             <div className="w-full bg-slate-200 rounded-full h-3 shadow-inner overflow-hidden">
               <div
                 className="bg-yellow-500 h-full rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${Math.min(macroPercentages.fat, 100)}%` }}
+                style={{ width: `${Math.min((macroPercentages.fat / getIdealMacroPercentages().fat) * 100, 100)}%` }}
               />
             </div>
           </div>
